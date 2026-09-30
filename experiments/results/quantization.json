@@ -1,0 +1,19 @@
+{
+ "cnn": {
+  "metric": "test accuracy",
+  "fp32": 0.9937,
+  "int8": 0.9936,
+  "bytes_fp32": 828456,
+  "bytes_int8": 209360,
+  "max_rel_weight_error": 0.003936359658837318
+ },
+ "gpt": {
+  "metric": "validation loss (nats/char)",
+  "fp32": 1.474000986814499,
+  "int8": 1.474009314775467,
+  "fp32_bpc": 2.126533913942716,
+  "int8_bpc": 2.1265459286507054,
+  "bytes_fp32": 10826496,
+  "bytes_int8": 2794948
+ }
+}

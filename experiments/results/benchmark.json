@@ -1,0 +1,29 @@
+{
+ "machine": "arm64 / arm",
+ "numpy": "2.4.4",
+ "torch": "2.11.0",
+ "threads": 4,
+ "rows": [
+  {
+   "model": "MLP 784-256-256-10 (batch 128)",
+   "sutra_ms": 0.6428330671042204,
+   "torch_ms": 0.555728969629854,
+   "slowdown": 1.156738450277988,
+   "language_model": false
+  },
+  {
+   "model": "DigitCNN (batch 128)",
+   "sutra_ms": 59.34081302257255,
+   "torch_ms": 16.43924997188151,
+   "slowdown": 3.6097031874368937,
+   "language_model": false
+  },
+  {
+   "model": "GPT 4x128, ctx 128 (batch 32)",
+   "sutra_ms": 109.5637499820441,
+   "torch_ms": 53.306853980757296,
+   "slowdown": 2.0553407639024135,
+   "language_model": true
+  }
+ ]
+}

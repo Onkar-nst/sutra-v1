@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+data/
+# raw checkpoints and per-run folders stay local; logs, results and web assets are committed
+runs/**/*.npz
+runs/studies/
+runs/*.txt

@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sutra Deep Learning</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a single-column lab report (max 1120px), left-aligned; each demo is a wide instrument panel,
+   each experiment a figure with its finding stated first. Indigo is the one accent; charts use the validated series palette. */
+:root {
+  --paper: #f5f6fa;
+  --panel: #ffffff;
+  --ink: #15172c;
+  --ink-2: #474b66;
+  --muted: #7d8099;
+  --rule: #dfe1eb;
+  --indigo: #3438a8;
+  --indigo-soft: #e8e9fb;
+  --good: #0a7d2c;
+  --pad-bg: #0f1022;
+  --pad-ink: #ffffff;
+  --code-bg: #eef0f7;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4;
+  --grid: #e5e7f0; --axis: #c3c6d6; --bar-muted: #c9cbdb;
+  --q1: #cde2fb; --q2: #9ec5f4; --q3: #6da7ec; --q4: #3987e5; --q5: #256abf; --q6: #184f95;
+  --cell-text-lo: #15172c; --cell-text-hi: #ffffff; --diag: #eceef6; --cell-empty: #f8f9fc;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --step--1: 0.8125rem; --step-0: 1rem; --step-1: 1.1875rem; --step-2: 1.5rem; --step-3: 2.125rem; --step-4: clamp(2.4rem, 5.2vw, 3.9rem);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e0f1d; --panel: #16182c; --ink: #eceefe; --ink-2: #b5b8d6; --muted: #868aa8; --rule: #2a2d48;
+    --indigo: #9296ff; --indigo-soft: #23264b; --good: #3ccf6a; --pad-bg: #07080f; --code-bg: #1c1f38;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+    --grid: #252842; --axis: #3a3d5c; --bar-muted: #3a3d5c;
+    --q1: #16335e; --q2: #1c5cab; --q3: #256abf; --q4: #3987e5; --q5: #6da7ec; --q6: #9ec5f4;
+    --cell-text-lo: #eceefe; --cell-text-hi: #0b0c18; --diag: #1b1d34; --cell-empty: #13152a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e0f1d; --panel: #16182c; --ink: #eceefe; --ink-2: #b5b8d6; --muted: #868aa8; --rule: #2a2d48;
+  --indigo: #9296ff; --indigo-soft: #23264b; --good: #3ccf6a; --pad-bg: #07080f; --code-bg: #1c1f38;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+  --grid: #252842; --axis: #3a3d5c; --bar-muted: #3a3d5c;
+  --q1: #16335e; --q2: #1c5cab; --q3: #256abf; --q4: #3987e5; --q5: #6da7ec; --q6: #9ec5f4;
+  --cell-text-lo: #eceefe; --cell-text-hi: #0b0c18; --diag: #1b1d34; --cell-empty: #13152a;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 var(--step-0)/1.6 var(--body); -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: max(16px, 4vw); }
+a { color: var(--indigo); text-underline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; border-radius: 4px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.015em; }
+h2 { font-size: var(--step-3); font-weight: 700; line-height: 1.1; }
+h3 { font-size: var(--step-1); font-weight: 700; line-height: 1.25; }
+p { margin: 0; max-width: 66ch; }
+code, .mono { font-family: var(--mono); font-size: 0.92em; }
+.eyebrow { font: 500 var(--step--1)/1.2 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+
+/* nav */
+.nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; background: color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--rule); }
+.nav .wrap { display: flex; align-items: center; gap: 24px; min-height: 56px; flex-wrap: wrap; }
+.wordmark { font: 800 1.35rem/1 var(--display); color: var(--ink); text-decoration: none; letter-spacing: -0.03em; }
+.nav ul { display: flex; gap: 20px; list-style: none; margin: 0; padding: 0; flex-wrap: wrap; }
+.nav ul a { color: var(--ink-2); text-decoration: none; font-size: var(--step--1); font-weight: 500; }
+.nav ul a:hover { color: var(--indigo); }
+.nav .gh { margin-left: auto; font: 500 var(--step--1) var(--mono); }
+
+/* hero */
+.hero { padding-block: 56px 40px; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 48px; align-items: start; }
+.hero h1 { font-size: var(--step-4); font-weight: 800; line-height: 1.02; letter-spacing: -0.035em; margin-block: 14px 20px; }
+.hero h1 em { font-style: normal; color: var(--indigo); }
+.hero .lede { font-size: var(--step-1); color: var(--ink-2); line-height: 1.55; }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 28px; margin: 32px 0 0; padding: 0; }
+.facts div { border-top: 1px solid var(--rule); padding-top: 10px; }
+.facts dt { font: 700 var(--step-2)/1.1 var(--display); color: var(--ink); }
+.facts dd { margin: 4px 0 0; color: var(--ink-2); font-size: var(--step--1); line-height: 1.45; }
+.live { background: var(--pad-bg); color: var(--pad-ink); border-radius: 14px; padding: 20px 22px 16px; min-height: 360px; display: flex; flex-direction: column; gap: 12px; }
+.live-head { display: flex; justify-content: space-between; gap: 12px; font: 500 0.75rem/1.3 var(--mono); color: #a9acd6; letter-spacing: 0.04em; text-transform: uppercase; }
+.live pre { margin: 0; flex: 1; font: 400 0.9rem/1.55 var(--mono); white-space: pre-wrap; word-break: break-word; color: #f1f1ff; min-height: 260px; }
+.caret { display: inline-block; width: 0.55em; height: 1.1em; background: #9296ff; vertical-align: text-bottom; animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .caret { animation: none; } }
+.live-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; font: 400 0.75rem/1.4 var(--mono); color: #a9acd6; }
+.live-foot button { font: 500 0.75rem var(--mono); background: transparent; color: #d7d8ff; border: 1px solid #3b3e6e; border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+.live-foot button:hover { border-color: #9296ff; }
+.check { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; font: 400 var(--step--1)/1.45 var(--mono); color: var(--ink-2); margin-top: 22px; }
+.check span { white-space: nowrap; }
+.check b { color: var(--good); font-weight: 500; }
+.check.fail b { color: #d03b3b; }
+
+/* sections */
+section.block { padding-block: 64px 24px; border-top: 1px solid var(--rule); }
+.section-head { display: grid; gap: 12px; margin-bottom: 28px; }
+.section-head p { color: var(--ink-2); }
+.panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; padding: 22px; }
+
+/* digits */
+.digits { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 28px; }
+.pad-col { display: grid; gap: 12px; justify-items: start; }
+#pad { width: 280px; height: 280px; max-width: 100%; background: var(--pad-bg); border-radius: 12px; touch-action: none; cursor: crosshair; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.btn { font: 500 var(--step--1) var(--body); background: var(--indigo); color: var(--panel); border: 0; border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--rule); }
+.btn:hover { filter: brightness(1.08); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.hint { font-size: var(--step--1); color: var(--muted); }
+.result { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 24px; align-items: start; }
+.seen { display: grid; gap: 6px; justify-items: center; }
+#seen { width: 112px; height: 112px; image-rendering: pixelated; border-radius: 6px; background: var(--pad-bg); }
+.guess { font: 800 4.5rem/1 var(--display); color: var(--ink); }
+.guess small { display: block; font: 500 var(--step--1) var(--mono); color: var(--muted); margin-top: 6px; }
+.probs { display: grid; gap: 5px; min-width: 0; }
+.prob { display: grid; grid-template-columns: 14px minmax(0, 1fr) 52px; gap: 10px; align-items: center; font: 400 var(--step--1) var(--mono); color: var(--ink-2); }
+.prob .track { height: 12px; background: var(--grid); border-radius: 0 4px 4px 0; overflow: hidden; }
+.prob .fill { height: 100%; background: var(--bar-muted); border-radius: 0 4px 4px 0; transition: width 120ms linear; }
+.prob.top .fill { background: var(--s1); }
+.prob.top { color: var(--ink); font-weight: 500; }
+.maps-title { margin: 22px 0 8px; }
+.maps { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 6px; }
+.maps canvas { width: 100%; aspect-ratio: 1; max-width: 100%; image-rendering: pixelated; border-radius: 4px; background: var(--grid); }
+.samples { display: grid; grid-template-columns: repeat(10, 26px); gap: 4px; }
+.samples button { padding: 0; border: 1px solid var(--rule); border-radius: 4px; background: var(--pad-bg); width: 26px; height: 26px; cursor: pointer; overflow: hidden; }
+.samples canvas { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+
+/* gpt */
+.gpt { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 28px; }
+.controls { display: grid; gap: 16px; align-content: start; }
+.controls label { display: grid; gap: 6px; font-size: var(--step--1); color: var(--ink-2); }
+.controls label span { display: flex; justify-content: space-between; }
+.controls output { font-family: var(--mono); color: var(--ink); }
+.controls textarea, .controls select { font: 400 var(--step--1) var(--mono); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); resize: vertical; }
+.controls input[type=range] { accent-color: var(--indigo); width: 100%; }
+#gen-out { font: 400 0.95rem/1.6 var(--mono); white-space: pre-wrap; word-break: break-word; min-height: 320px; max-height: 560px; overflow-y: auto; margin: 0; }
+#gen-out span { border-radius: 2px; cursor: default; }
+#gen-out span.prompt { color: var(--muted); }
+#gen-out span.focus { outline: 2px solid var(--indigo); }
+.attn-bar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; justify-content: space-between; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); font-size: var(--step--1); color: var(--ink-2); }
+.attn-bar select { font: 400 var(--step--1) var(--mono); padding: 4px 8px; border-radius: 6px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); }
+#attn-note { font-family: var(--mono); color: var(--ink-2); min-height: 1.4em; }
+
+/* experiments */
+.figs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.fig { background: var(--panel); border: 1px solid var(--rule); border-radius: 14px; padding: 20px 20px 16px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.fig.wide { grid-column: 1 / -1; }
+.fig .finding { color: var(--ink-2); font-size: 0.95rem; }
+.fig .method { color: var(--muted); font-size: var(--step--1); line-height: 1.5; }
+.chart { position: relative; min-width: 0; }
+.chart-svg { display: block; overflow: visible; font-family: var(--body); }
+.chart-svg .grid { stroke: var(--grid); stroke-width: 1; }
+.chart-svg .axis { stroke: var(--axis); stroke-width: 1; }
+.chart-svg .tick { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart-svg .axis-label { fill: var(--ink-2); font-size: 11.5px; }
+.chart-svg .series-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart-svg .fit-line { fill: none; stroke-width: 1.5; stroke-dasharray: none; opacity: 0.8; }
+.chart-svg .marker { stroke: var(--panel); stroke-width: 2; }
+.chart-svg .crosshair { stroke: var(--axis); stroke-width: 1; }
+.chart-svg .end-label, .chart-svg .bar-value { fill: var(--ink-2); font-size: 11.5px; }
+.chart-svg .bar-label { fill: var(--ink); font-size: 12px; }
+.chart-svg .whisker { stroke: var(--ink-2); stroke-width: 1.5; }
+.chart-svg .cell-text { fill: var(--cell-text-lo); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart-svg .cell-text.on-dark { fill: var(--cell-text-hi); }
+.chart-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: var(--step--1); color: var(--ink-2); margin-bottom: 6px; }
+.chart-legend i, .chart-tip i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.chart-tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--rule); box-shadow: 0 6px 20px rgba(10, 12, 40, 0.14); border-radius: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.5; color: var(--ink); white-space: nowrap; z-index: 5; }
+.chart-tip span { color: var(--muted); }
+.table-scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: var(--step--1); font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 10px 7px 0; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th { font-weight: 500; color: var(--muted); }
+td.num, th.num { text-align: right; }
+.pending { color: var(--muted); font-size: var(--step--1); font-style: italic; }
+.samples-text { font: 400 var(--step--1)/1.5 var(--mono); white-space: pre-wrap; color: var(--ink-2); background: var(--code-bg); border-radius: 8px; padding: 12px; margin: 0; max-height: 180px; overflow: auto; }
+
+/* engine */
+.engine { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+pre.code { background: var(--code-bg); border-radius: 12px; padding: 18px; overflow-x: auto; font: 400 0.84rem/1.6 var(--mono); margin: 0; color: var(--ink); }
+pre.code .c { color: var(--muted); }
+pre.code .k { color: var(--indigo); font-weight: 500; }
+.modules { display: grid; gap: 0; margin: 0; }
+.modules div { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 16px; padding: 11px 0; border-bottom: 1px solid var(--rule); }
+.modules dt { font: 500 var(--step--1) var(--mono); color: var(--ink); }
+.modules dd { margin: 0; font-size: var(--step--1); color: var(--ink-2); }
+footer { padding-block: 40px 56px; color: var(--muted); font-size: var(--step--1); border-top: 1px solid var(--rule); margin-top: 48px; }
+
+@media (max-width: 900px) {
+  .hero, .gpt, .engine, .figs { grid-template-columns: minmax(0, 1fr); }
+  .digits, .result { grid-template-columns: minmax(0, 1fr); }
+  .hero { padding-block: 32px 28px; gap: 28px; }
+  .modules div { grid-template-columns: 120px minmax(0, 1fr); }
+}
+@media (max-width: 440px) {
+  .facts { grid-template-columns: minmax(0, 1fr); }
+  .samples { grid-template-columns: repeat(8, 26px); }
+  .nav ul { gap: 14px; }
+}
+</style>
+</head>
+<body>
+<nav class="nav" aria-label="Sections">
+  <div class="wrap">
+    <a class="wordmark" href="#top">sutra</a>
+    <ul>
+      <li><a href="#digits">Digits</a></li>
+      <li><a href="#shakespeare">Shakespeare</a></li>
+      <li><a href="#experiments">Experiments</a></li>
+      <li><a href="#engine">Engine</a></li>
+    </ul>
+    <a class="gh" href="https://github.com/Onkar-nst/sutra">github.com/Onkar-nst/sutra</a>
+  </div>
+</nav>
+
+<main id="top">
+  <div class="wrap hero">
+    <div>
+      <div class="eyebrow">A deep-learning framework written from scratch</div>
+      <h1>Autograd, layers, optimizers and a GPT, in <em>pure NumPy</em>.</h1>
+      <p class="lede">Sutra is a PyTorch-style framework built without PyTorch. Every backward pass is derived by hand and checked against PyTorch. It trained the two models on this page, which now run in your browser on a <span data-bind="engine_lines">250</span>-line JavaScript engine.</p>
+      <dl class="facts">
+        <div><dt data-bind="mnist_acc">99.37%</dt><dd>MNIST test accuracy, CNN trained with Sutra</dd></div>
+        <div><dt data-bind="bpc">…</dt><dd>bits per character on held-out Shakespeare (<span data-bind="gpt_params">2.7M</span>-param GPT)</dd></div>
+        <div><dt data-bind="tests">200+</dt><dd>tests check values and gradients against PyTorch</dd></div>
+        <div><dt>0</dt><dd>dependencies beyond NumPy for the framework itself</dd></div>
+      </dl>
+      <div class="check" id="selftest"><span>Browser engine check:</span> <b>running…</b></div>
+    </div>
+    <div class="live" aria-live="polite">
+      <div class="live-head"><span>Live · Sutra-trained GPT</span><span id="hero-rate">loading weights…</span></div>
+      <pre id="hero-text"><span class="caret"></span></pre>
+      <div class="live-foot"><span>character by character, sampled at temperature 0.8</span><button type="button" id="hero-again">Write another</button></div>
+    </div>
+  </div>
+
+  <section class="block" id="digits">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="eyebrow">Demo 1 · Convolutional network</div>
+        <h2>Draw a digit</h2>
+        <p>A two-layer CNN (<span data-bind="cnn_params">206,922</span> parameters) trained on MNIST with Sutra. BatchNorm is folded into the convolutions and the weights ship as int8. Your drawing is cropped, scaled to 20 px and centred by its centre of mass, which is how MNIST was made.</p>
+      </div>
+      <div class="panel digits">
+        <div class="pad-col">
+          <canvas id="pad" width="280" height="280" aria-label="Drawing pad"></canvas>
+          <div class="row"><button type="button" class="btn ghost" id="clear">Clear</button><span class="hint">or pick a test image</span></div>
+          <div class="samples" id="samples"></div>
+        </div>
+        <div style="min-width:0">
+          <div class="result">
+            <div class="seen">
+              <div class="guess" id="guess">–<small>prediction</small></div>
+              <canvas id="seen" width="28" height="28" aria-label="The 28 by 28 input the network sees"></canvas>
+              <span class="hint">what the network sees</span>
+            </div>
+            <div class="probs" id="probs"></div>
+          </div>
+          <h3 class="maps-title">First-layer feature maps</h3>
+          <p class="hint">The 16 learned 3×3 filters after ReLU. Some respond to strokes at one orientation, others to edges.</p>
+          <div class="maps" id="maps" style="margin-top:10px"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="shakespeare">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="eyebrow">Demo 2 · Transformer language model</div>
+        <h2>Write with a GPT that Sutra trained</h2>
+        <p>A <span data-bind="gpt_arch">6-layer, 6-head, 192-wide</span> character-level GPT trained on 1 MB of Shakespeare. The browser runs it one character at a time with a key-value cache. Hover any character to see which earlier characters it attended to.</p>
+      </div>
+      <div class="panel gpt">
+        <form class="controls" id="gen-form">
+          <label for="prompt">Prompt<textarea id="prompt" rows="3">ROMEO:
+</textarea></label>
+          <label for="temp"><span>Temperature <output id="temp-out">0.8</output></span><input type="range" id="temp" min="0" max="1.5" step="0.05" value="0.8"></label>
+          <label for="topk"><span>Top-k <output id="topk-out">20</output></span><input type="range" id="topk" min="1" max="65" step="1" value="20"></label>
+          <label for="len"><span>Characters <output id="len-out">500</output></span><input type="range" id="len" min="100" max="1500" step="50" value="500"></label>
+          <div class="row"><button type="submit" class="btn" id="gen-btn">Generate</button><span class="hint" id="gen-rate"></span></div>
+        </form>
+        <div style="min-width:0">
+          <pre id="gen-out" aria-live="polite"></pre>
+          <div class="attn-bar">
+            <span id="attn-note">Hover a character to inspect its attention.</span>
+            <span class="row">
+              <label for="attn-layer" class="hint">Layer</label><select id="attn-layer"></select>
+              <label for="attn-head" class="hint">Head</label><select id="attn-head"></select>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="experiments">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="eyebrow">Evidence</div>
+        <h2>Experiments, all trained on Sutra</h2>
+        <p>Every curve below comes from a model trained on this framework on a laptop CPU. Ablations use a held-out validation split, repeat each configuration over several seeds, and report 95% confidence intervals.</p>
+      </div>
+      <div class="figs" id="figs"></div>
+    </div>
+  </section>
+
+  <section class="block" id="engine">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="eyebrow">Inside</div>
+        <h2>How the engine works</h2>
+        <p>Each operation records its inputs and a closure that maps the output gradient to input gradients. <code>backward()</code> sorts the graph topologically without recursion and runs those closures in reverse. Hot paths such as convolution, attention, the norms and cross-entropy have fused, hand-derived backward passes.</p>
+      </div>
+      <div class="engine">
+<pre class="code"><span class="k">import</span> sutra <span class="k">as</span> st
+<span class="k">from</span> sutra <span class="k">import</span> nn, optim, F
+
+model = nn.Sequential(
+    nn.Conv2d(1, 16, 3, padding=1),
+    nn.BatchNorm2d(16), nn.ReLU(),
+    nn.MaxPool2d(2), nn.Flatten(),
+    nn.Linear(16 * 14 * 14, 10))
+opt = optim.AdamW(model.parameters(), 3e-3)
+
+<span class="k">for</span> x, y <span class="k">in</span> loader:
+    loss = F.cross_entropy(model(x), y)
+    opt.zero_grad()
+    loss.backward()        <span class="c"># reverse-mode autodiff</span>
+    opt.step()
+
+<span class="c"># fused attention backward, derived by hand:</span>
+<span class="c"># dV = Pᵀ·dO     dP = dO·Vᵀ</span>
+<span class="c"># dS = P ⊙ (dP − rowsum(dP ⊙ P))</span>
+<span class="c"># dQ = dS·K/√d   dK = dSᵀ·Q/√d</span></pre>
+        <dl class="modules">
+          <div><dt>tensor.py</dt><dd>Tensor, broadcasting-aware autograd engine, 40+ differentiable ops, no_grad, retain_grad</dd></div>
+          <div><dt>functional.py</dt><dd>conv2d via im2col, pooling, fused attention, LayerNorm, BatchNorm, softmax, cross-entropy with label smoothing</dd></div>
+          <div><dt>nn.py</dt><dd>Module system with parameter registration, buffers, state dicts, train/eval, and the standard layers</dd></div>
+          <div><dt>optim.py</dt><dd>SGD with Nesterov, Adam, AdamW, RMSprop, param groups, gradient clipping, cosine warmup</dd></div>
+          <div><dt>tokenizer.py</dt><dd>Byte-level BPE with incremental pair counts, trained in 0.4 s on 1 MB</dd></div>
+          <div><dt>models/gpt.py</dt><dd>GPT-2-style decoder with weight tying, KV-cache sampling, top-k and nucleus sampling</dd></div>
+          <div><dt>quantize.py</dt><dd>Per-row symmetric int8 post-training quantisation</dd></div>
+          <div><dt>web/sutra.js</dt><dd>The browser inference engine used by the demos on this page</dd></div>
+        </dl>
+      </div>
+    </div>
+  </section>
+</main>
+<footer>
+  <div class="wrap">Sutra · built by Onkar Dange · MIT licence · The models on this page were trained on an Apple M3 laptop CPU with NumPy only.</div>
+</footer>
+
+<script src="charts.js"></script>
+<script src="sutra.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

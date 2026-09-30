@@ -1,0 +1,42 @@
+{
+ "iters": 1500,
+ "architecture": "4 layers, 128 wide, 4 heads, context 128 tokens",
+ "rows": [
+  {
+   "tokenizer": "char",
+   "vocab_size": 65,
+   "params": 818048,
+   "chars_per_token": 1.0,
+   "val_loss_per_token": 1.7202004671096802,
+   "val_bpc": 2.481724683234014,
+   "sample": "\nNo Good my Collior hand ply; ond so myself.\n\nSICINIUS:\nCome leave, what, you your lords;\nTo--surest men, if I ratch vardent firge,\nOr herege openies tell his the love to hunch;\nWith brother die your make offall have though as last.\n\nRATCLIZAring Much husband, this he have rive,\nWhich should me offe"
+  },
+  {
+   "tokenizer": "BPE-256 (bytes)",
+   "vocab_size": 256,
+   "params": 842496,
+   "chars_per_token": 1.0,
+   "val_loss_per_token": 1.7307798147201539,
+   "val_bpc": 2.496987455567485,
+   "sample": "\nNo Eow thy Buckinghal prokes of Norectune,\nFor thou tell that and criefulle owrishAn.\n\nSAMPY:\nYour shall messince thou'd know veace, of thy men\nMy sho"
+  },
+  {
+   "tokenizer": "BPE-512",
+   "vocab_size": 512,
+   "params": 875264,
+   "chars_per_token": 1.8777461658894632,
+   "val_loss_per_token": 2.9667879343032837,
+   "val_bpc": 2.279418974694644,
+   "sample": "\nNorcage for your grace in ribridience,\nFrom gentle Hastings to the queen and thyself\nWhen breaths and rage thanks, and studgggs, and some.\n\nKING RICHARD III:\nNow here not heed, in another or ever\nBut all uncle'sty the man, and heaven\nThere is raging to her little,\nNot I shall be she is to see a cro"
+  },
+  {
+   "tokenizer": "BPE-1024",
+   "vocab_size": 1024,
+   "params": 940800,
+   "chars_per_token": 2.256980979360583,
+   "val_loss_per_token": 3.5240035891532897,
+   "val_bpc": 2.2525943056847146,
+   "sample": "\nStivine on his father's name and\nOffferection of duthorous lord.\nThen let him for this chase cuty view the cast,\nWhich you shall fire him to know, and danger my\nAnd fealse and bawd testime in blood,\nTo keep and his promise of himself inforts;\nHe cannot call the people of backs,\nAnd make air of talk"
+  }
+ ]
+}

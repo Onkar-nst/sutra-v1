@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sutra-dl"
+version = "1.0.0"
+description = "A deep-learning framework written from scratch in NumPy: autograd, layers, optimizers, a GPT, and a browser inference engine."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Onkar Dange" }]
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "torch>=2.0", "scipy>=1.10", "matplotlib>=3.7"]
+
+[tool.setuptools]
+packages = ["sutra", "sutra.models"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
