@@ -1,0 +1,8 @@
+{
+  "headers": [
+    {
+      "source": "/assets/(.*)\\.bin",
+      "headers": [{ "key": "Content-Type", "value": "application/octet-stream" }]
+    }
+  ]
+}
