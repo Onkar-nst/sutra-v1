@@ -257,6 +257,19 @@ class LayerNorm(Module):
         return f"{self.dim}"
 
 
+class RMSNorm(Module):
+    def __init__(self, dim: int, eps: float = 1e-5):
+        super().__init__()
+        self.dim, self.eps = dim, eps
+        self.weight = Parameter(np.ones(dim, dtype=get_default_dtype()))
+
+    def forward(self, x):
+        return F.rms_norm(x, self.weight, self.eps)
+
+    def extra_repr(self):
+        return f"{self.dim}"
+
+
 class Embedding(Module):
     def __init__(self, num_embeddings: int, dim: int):
         super().__init__()
@@ -327,23 +340,35 @@ class Sigmoid(Module):
 
 
 class MultiHeadAttention(Module):
-    """Self-attention with a fused QKV projection, optional causal mask, and KV cache."""
+    """
+    Self-attention with a fused QKV projection, optional causal mask, optional rotary embeddings,
+    and a KV cache. `head_mask` / `head_mean` let experiments ablate individual heads.
+    """
 
-    def __init__(self, dim: int, n_heads: int, dropout: float = 0.0, causal: bool = True, bias: bool = True):
+    def __init__(self, dim: int, n_heads: int, dropout: float = 0.0, causal: bool = True, bias: bool = True,
+                 rope: bool = False, rope_base: float = 10000.0):
         super().__init__()
         assert dim % n_heads == 0, "dim must be divisible by n_heads"
         self.dim, self.n_heads, self.causal, self.dropout = dim, n_heads, causal, dropout
+        self.rope, self.rope_base = rope, rope_base
         self.qkv = Linear(dim, 3 * dim, bias=bias)
         self.proj = Linear(dim, dim, bias=bias)
         self.resid_drop = Dropout(dropout)
-        self.last_attention = None  # set when `keep_attention` is on (for visualisation)
-        self.keep_attention = False
+        self.keep_attention = False  # store the attention pattern (for visualisation / interpretability)
+        self.last_attention = None
+        self.keep_head_output = False  # store per-head outputs (B, H, T, head_dim) before the projection
+        self.last_head_output = None
+        self.head_mask = None        # (H,) array: 1 keeps a head, 0 replaces its output by head_mean
+        self.head_mean = None        # (H, head_dim) replacement values for ablated heads (zeros if None)
 
-    def forward(self, x, kv_cache: dict | None = None):
+    def forward(self, x, kv_cache: dict | None = None, pos_offset: int = 0):
         B, T, C = x.shape
         H, hd = self.n_heads, C // self.n_heads
         q, k, v = self.qkv(x).split(C, axis=-1)
         q, k, v = (t.reshape(B, T, H, hd).transpose(0, 2, 1, 3) for t in (q, k, v))
+        if self.rope:
+            cos, sin = F.rope_cache(hd, np.arange(pos_offset, pos_offset + T), self.rope_base, x.dtype)
+            q, k = F.apply_rope(q, cos, sin), F.apply_rope(k, cos, sin)
         if kv_cache is not None:  # inference only: append to and read from the cache
             if "k" in kv_cache:
                 k = Tensor(np.concatenate([kv_cache["k"], k.data], axis=2))
@@ -353,8 +378,15 @@ class MultiHeadAttention(Module):
                                                 training=self.training, return_weights=True)
         if self.keep_attention:
             self.last_attention = att
+        if self.keep_head_output:
+            self.last_head_output = y.data
+        if self.head_mask is not None:
+            m = np.asarray(self.head_mask, dtype=y.dtype).reshape(1, H, 1, 1)
+            mean = np.zeros((1, H, 1, hd), dtype=y.dtype) if self.head_mean is None else \
+                np.asarray(self.head_mean, dtype=y.dtype).reshape(1, H, 1, hd)
+            y = y * m + (1 - m) * mean
         y = y.transpose(0, 2, 1, 3).reshape(B, T, C)
         return self.resid_drop(self.proj(y))
 
     def extra_repr(self):
-        return f"dim={self.dim}, heads={self.n_heads}, causal={self.causal}"
+        return f"dim={self.dim}, heads={self.n_heads}, causal={self.causal}, rope={self.rope}"

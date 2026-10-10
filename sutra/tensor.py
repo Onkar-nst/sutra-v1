@@ -55,6 +55,21 @@ class no_grad:
         return wrapper
 
 
+class enable_grad:
+    """Context manager that turns graph construction back on (e.g. inside a no_grad region)."""
+
+    def __enter__(self):
+        global _GRAD_ENABLED
+        self._prev = _GRAD_ENABLED
+        _GRAD_ENABLED = True
+        return self
+
+    def __exit__(self, *exc):
+        global _GRAD_ENABLED
+        _GRAD_ENABLED = self._prev
+        return False
+
+
 # --------------------------------------------------------------------------- helpers
 
 def _to_array(x, dtype=None) -> np.ndarray:

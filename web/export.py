@@ -30,8 +30,9 @@ WEB = ROOT / "web"
 OUT = WEB / "assets"
 
 
-def write_bundle(name: str, tensors: dict, meta: dict) -> dict:
+def write_bundle(name: str, tensors: dict, meta: dict, out_dir: Path | None = None) -> dict:
     """One binary blob + a JSON manifest. int8 tensors carry float32 per-row scales. 4-byte aligned."""
+    out_dir = out_dir or OUT
     blob, manifest = bytearray(), []
 
     def put(arr):
@@ -52,8 +53,8 @@ def write_bundle(name: str, tensors: dict, meta: dict) -> dict:
         else:
             manifest.append({"name": key, "shape": list(arr.shape), "dtype": "float32", "offset": put(arr)})
             deq[key] = arr
-    (OUT / f"{name}.bin").write_bytes(bytes(blob))
-    (OUT / f"{name}.json").write_text(json.dumps({"tensors": manifest, **meta}))
+    (out_dir / f"{name}.bin").write_bytes(bytes(blob))
+    (out_dir / f"{name}.json").write_text(json.dumps({"tensors": manifest, **meta}))
     print(f"{name}: {len(blob) / 1e6:.2f} MB ({len(manifest)} tensors)")
     return deq
 

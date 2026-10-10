@@ -360,3 +360,64 @@ def scaled_dot_product_attention(q: Tensor, k: Tensor, v: Tensor, causal: bool =
                 gv if v.requires_grad else None)
     res = _result(out, (q, k, v), bw, "sdpa")
     return (res, P) if return_weights else res
+
+
+# ------------------------------------------------------------------ modern (LLaMA-style) components
+
+def silu(x: Tensor) -> Tensor:
+    """SiLU / swish: x * sigmoid(x)."""
+    d = x.data
+    s = np.exp(-np.logaddexp(0, -d)).astype(d.dtype, copy=False)
+
+    def bw(g):
+        return (g * s * (1 + d * (1 - s)),)
+    return _result(d * s, (x,), bw, "silu")
+
+
+def rms_norm(x: Tensor, weight: Tensor | None = None, eps: float = 1e-5) -> Tensor:
+    """RMSNorm over the last dimension (Zhang & Sennrich, 2019): no mean-centring, no bias."""
+    d = x.data
+    D = d.shape[-1]
+    r = 1.0 / np.sqrt((d * d).mean(axis=-1, keepdims=True) + eps)
+    xhat = d * r
+    out = xhat if weight is None else xhat * weight.data
+    parents = (x,) if weight is None else (x, weight)
+
+    def bw(g):
+        gxhat = g if weight is None else g * weight.data
+        gx = r * (gxhat - xhat * (gxhat * xhat).mean(axis=-1, keepdims=True)) if x.requires_grad else None
+        if weight is None:
+            return (gx,)
+        return gx, (g.reshape(-1, D) * xhat.reshape(-1, D)).sum(axis=0)
+    return _result(out, parents, bw, "rms_norm")
+
+
+def rope_cache(head_dim: int, positions, base: float = 10000.0, dtype=np.float32):
+    """cos/sin tables for rotary embeddings, shape (T, head_dim) in the 'rotate-half' layout."""
+    inv = base ** (-np.arange(0, head_dim, 2, dtype=np.float64) / head_dim)
+    ang = np.asarray(positions, dtype=np.float64)[:, None] * inv[None, :]
+    ang = np.concatenate([ang, ang], axis=-1)
+    return np.cos(ang).astype(dtype), np.sin(ang).astype(dtype)
+
+
+def _rotate_half(a: np.ndarray) -> np.ndarray:
+    h = a.shape[-1] // 2
+    return np.concatenate([-a[..., h:], a[..., :h]], axis=-1)
+
+
+def _rotate_half_T(a: np.ndarray) -> np.ndarray:  # adjoint of _rotate_half
+    h = a.shape[-1] // 2
+    return np.concatenate([a[..., h:], -a[..., :h]], axis=-1)
+
+
+def apply_rope(x: Tensor, cos: np.ndarray, sin: np.ndarray) -> Tensor:
+    """
+    Rotary position embedding (Su et al., 2021) on x (..., T, head_dim):  y = x*cos + rotate_half(x)*sin.
+    The map is a rotation, so the backward pass is the inverse rotation:  gx = g*cos + rotate_half^T(g*sin).
+    """
+    d = x.data
+    out = d * cos + _rotate_half(d) * sin
+
+    def bw(g):
+        return (g * cos + _rotate_half_T(g * sin),)
+    return _result(out, (x,), bw, "rope")

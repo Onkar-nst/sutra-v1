@@ -1,0 +1,152 @@
+{
+ "positions": 4000,
+ "rows": [
+  {
+   "k": 4,
+   "window": 32,
+   "coverage": 0.02025,
+   "precision": 0.5679012345679012,
+   "useful": 0.0115
+  },
+  {
+   "k": 4,
+   "window": 64,
+   "coverage": 0.05025,
+   "precision": 0.5621890547263682,
+   "useful": 0.02825
+  },
+  {
+   "k": 4,
+   "window": 128,
+   "coverage": 0.1005,
+   "precision": 0.599502487562189,
+   "useful": 0.06025
+  },
+  {
+   "k": 4,
+   "window": 256,
+   "coverage": 0.15975,
+   "precision": 0.596244131455399,
+   "useful": 0.09525
+  },
+  {
+   "k": 4,
+   "window": 512,
+   "coverage": 0.2415,
+   "precision": 0.5952380952380952,
+   "useful": 0.14375
+  },
+  {
+   "k": 4,
+   "window": 1024,
+   "coverage": 0.32925,
+   "precision": 0.5801063022019742,
+   "useful": 0.191
+  },
+  {
+   "k": 4,
+   "window": 2048,
+   "coverage": 0.42025,
+   "precision": 0.546103509815586,
+   "useful": 0.2295
+  },
+  {
+   "k": 8,
+   "window": 32,
+   "coverage": 0.00275,
+   "precision": 0.6363636363636364,
+   "useful": 0.00175
+  },
+  {
+   "k": 8,
+   "window": 64,
+   "coverage": 0.00825,
+   "precision": 0.7575757575757576,
+   "useful": 0.00625
+  },
+  {
+   "k": 8,
+   "window": 128,
+   "coverage": 0.0245,
+   "precision": 0.7959183673469388,
+   "useful": 0.0195
+  },
+  {
+   "k": 8,
+   "window": 256,
+   "coverage": 0.03875,
+   "precision": 0.7741935483870968,
+   "useful": 0.03
+  },
+  {
+   "k": 8,
+   "window": 512,
+   "coverage": 0.057,
+   "precision": 0.7763157894736842,
+   "useful": 0.04425
+  },
+  {
+   "k": 8,
+   "window": 1024,
+   "coverage": 0.07625,
+   "precision": 0.7672131147540984,
+   "useful": 0.0585
+  },
+  {
+   "k": 8,
+   "window": 2048,
+   "coverage": 0.0895,
+   "precision": 0.7541899441340782,
+   "useful": 0.0675
+  },
+  {
+   "k": 16,
+   "window": 32,
+   "coverage": 0.00025,
+   "precision": 1.0,
+   "useful": 0.00025
+  },
+  {
+   "k": 16,
+   "window": 64,
+   "coverage": 0.00025,
+   "precision": 1.0,
+   "useful": 0.00025
+  },
+  {
+   "k": 16,
+   "window": 128,
+   "coverage": 0.0015,
+   "precision": 0.8333333333333334,
+   "useful": 0.00125
+  },
+  {
+   "k": 16,
+   "window": 256,
+   "coverage": 0.00225,
+   "precision": 0.8888888888888888,
+   "useful": 0.002
+  },
+  {
+   "k": 16,
+   "window": 512,
+   "coverage": 0.003,
+   "precision": 0.9166666666666666,
+   "useful": 0.00275
+  },
+  {
+   "k": 16,
+   "window": 1024,
+   "coverage": 0.00425,
+   "precision": 0.7647058823529411,
+   "useful": 0.00325
+  },
+  {
+   "k": 16,
+   "window": 2048,
+   "coverage": 0.005,
+   "precision": 0.8,
+   "useful": 0.004
+  }
+ ]
+}

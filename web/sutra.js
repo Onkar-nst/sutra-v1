@@ -2,7 +2,9 @@
  * sutra.js — a zero-dependency inference engine for models trained with Sutra.
  *
  * Loads the int8/float32 bundles written by web/export.py, dequantises them, and runs the
- * DigitCNN and the GPT (with a KV cache) in plain JavaScript on typed arrays.
+ * DigitCNN and the GPT (with a KV cache) in plain JavaScript on typed arrays. The GPT runs both the
+ * GPT-2-style flagship (LayerNorm, learned positions, GELU) and the LLaMA-style one
+ * (RMSNorm, rotary embeddings, SwiGLU, no biases).
  */
 (function (global) {
   "use strict";
@@ -62,6 +64,33 @@
       for (let i = 0; i < D; i++) y[o + i] = (x[o + i] - mu) * r * w[i] + b[i];
     }
     return y;
+  }
+
+  function rmsNorm(x, D, w, eps = 1e-5) {
+    const y = new Float32Array(x.length);
+    for (let o = 0; o < x.length; o += D) {
+      let ms = 0;
+      for (let i = 0; i < D; i++) ms += x[o + i] * x[o + i];
+      const r = 1 / Math.sqrt(ms / D + eps);
+      for (let i = 0; i < D; i++) y[o + i] = x[o + i] * r * w[i];
+    }
+    return y;
+  }
+
+  /** Rotary embedding in place on one head vector (rotate-half layout, matching sutra.functional.apply_rope). */
+  function ropeInPlace(v, offset, hd, pos, base = 10000) {
+    const h = hd >> 1;
+    for (let i = 0; i < h; i++) {
+      const ang = pos * Math.pow(base, (-2 * i) / hd), c = Math.cos(ang), s = Math.sin(ang);
+      const x1 = v[offset + i], x2 = v[offset + i + h];
+      v[offset + i] = x1 * c - x2 * s;
+      v[offset + i + h] = x2 * c + x1 * s;
+    }
+  }
+
+  function siluInPlace(x) {
+    for (let i = 0; i < x.length; i++) x[i] = x[i] / (1 + Math.exp(-x[i]));
+    return x;
   }
 
   function geluInPlace(x) {
@@ -159,7 +188,8 @@
   class GPT {
     constructor(bundle) {
       this.t = bundle.tensors;
-      this.cfg = bundle.manifest.config;
+      // older bundles predate these fields: they are GPT-2 style
+      this.cfg = Object.assign({ norm: "layer", pos: "learned", mlp: "gelu", bias: true }, bundle.manifest.config);
       this.tok = new CharTokenizer(bundle.manifest.tokenizer.chars);
       const L = this.cfg.n_layer, T = this.cfg.block_size, D = this.cfg.n_embd;
       this.K = Array.from({ length: L }, () => new Float32Array(T * D));
@@ -170,7 +200,26 @@
 
     reset() { this.pos = 0; this.history = []; }
 
-    p(name) { return this.t[name].data; }
+    p(name) { return this.t[name] ? this.t[name].data : null; }
+
+    norm(x, prefix) {
+      const D = this.cfg.n_embd;
+      return this.cfg.norm === "rms" ? rmsNorm(x, D, this.p(prefix + ".weight"))
+        : layerNorm(x, D, this.p(prefix + ".weight"), this.p(prefix + ".bias") || new Float32Array(D));
+    }
+
+    mlp(h, pre) {
+      const D = this.cfg.n_embd;
+      if (this.cfg.mlp === "swiglu") {
+        const H = this.t[pre + "mlp.gate.weight"].shape[0];
+        const g = siluInPlace(linear(h, 1, D, this.p(pre + "mlp.gate.weight"), this.p(pre + "mlp.gate.bias"), H));
+        const u = linear(h, 1, D, this.p(pre + "mlp.up.weight"), this.p(pre + "mlp.up.bias"), H);
+        for (let i = 0; i < H; i++) g[i] *= u[i];
+        return linear(g, 1, H, this.p(pre + "mlp.proj.weight"), this.p(pre + "mlp.proj.bias"), D);
+      }
+      const m = geluInPlace(linear(h, 1, D, this.p(pre + "mlp.fc.weight"), this.p(pre + "mlp.fc.bias"), 4 * D));
+      return linear(m, 1, 4 * D, this.p(pre + "mlp.proj.weight"), this.p(pre + "mlp.proj.bias"), D);
+    }
 
     /** Feed one token. Returns next-token logits and attention weights [layer][head] over the cached context. */
     step(token) {
@@ -186,12 +235,15 @@
       }
       const hd = D / H, scale = 1 / Math.sqrt(hd), pos = this.pos;
       const x = new Float32Array(D), wte = this.p("wte.weight"), wpe = this.p("wpe.weight");
-      for (let i = 0; i < D; i++) x[i] = wte[token * D + i] + wpe[pos * D + i];
+      for (let i = 0; i < D; i++) x[i] = wte[token * D + i] + (wpe ? wpe[pos * D + i] : 0);
       const attn = [];
       for (let l = 0; l < L; l++) {
         const pre = "blocks." + l + ".";
-        const h = layerNorm(x, D, this.p(pre + "ln1.weight"), this.p(pre + "ln1.bias"));
+        const h = this.norm(x, pre + "ln1");
         const qkv = linear(h, 1, D, this.p(pre + "attn.qkv.weight"), this.p(pre + "attn.qkv.bias"), 3 * D);
+        if (this.cfg.pos === "rope") {
+          for (let hh = 0; hh < H; hh++) { ropeInPlace(qkv, hh * hd, hd, pos); ropeInPlace(qkv, D + hh * hd, hd, pos); }
+        }
         const Kc = this.K[l], Vc = this.V[l];
         Kc.set(qkv.subarray(D, 2 * D), pos * D);
         Vc.set(qkv.subarray(2 * D, 3 * D), pos * D);
@@ -213,12 +265,12 @@
         attn.push(heads);
         const a = linear(y, 1, D, this.p(pre + "attn.proj.weight"), this.p(pre + "attn.proj.bias"), D);
         for (let i = 0; i < D; i++) x[i] += a[i];
-        const h2 = layerNorm(x, D, this.p(pre + "ln2.weight"), this.p(pre + "ln2.bias"));
-        const m = geluInPlace(linear(h2, 1, D, this.p(pre + "mlp.fc.weight"), this.p(pre + "mlp.fc.bias"), 4 * D));
-        const mo = linear(m, 1, 4 * D, this.p(pre + "mlp.proj.weight"), this.p(pre + "mlp.proj.bias"), D);
-        for (let i = 0; i < D; i++) x[i] += mo[i];
+        if (this.t[pre + "ln2.weight"]) {  // attention-only models have no MLP
+          const mo = this.mlp(this.norm(x, pre + "ln2"), pre);
+          for (let i = 0; i < D; i++) x[i] += mo[i];
+        }
       }
-      const hf = layerNorm(x, D, this.p("ln_f.weight"), this.p("ln_f.bias"));
+      const hf = this.norm(x, "ln_f");
       const logits = linear(hf, 1, D, wte, null, Vs);  // weight-tied head
       this.pos++;
       return { logits, attn, ctxLen: this.pos };  // attention covers the last ctxLen tokens
@@ -240,5 +292,6 @@
     }
   }
 
-  global.Sutra = { loadBundle, DigitCNN, GPT, CharTokenizer, kernels: { linear, layerNorm, softmax, conv2dSame, maxPool2 } };
+  global.Sutra = { loadBundle, DigitCNN, GPT, CharTokenizer,
+    kernels: { linear, layerNorm, rmsNorm, softmax, conv2dSame, maxPool2, ropeInPlace } };
 })(typeof window !== "undefined" ? window : globalThis);

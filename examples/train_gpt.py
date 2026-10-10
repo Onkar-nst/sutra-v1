@@ -34,6 +34,10 @@ def build_parser():
     ap.add_argument("--n_layer", type=int, default=6)
     ap.add_argument("--n_head", type=int, default=6)
     ap.add_argument("--n_embd", type=int, default=192)
+    ap.add_argument("--norm", choices=["layer", "rms"], default="layer")
+    ap.add_argument("--pos", choices=["learned", "rope"], default="learned")
+    ap.add_argument("--mlp", choices=["gelu", "swiglu"], default="gelu")
+    ap.add_argument("--no_bias", action="store_true")
     ap.add_argument("--block", type=int, default=128)
     ap.add_argument("--batch", type=int, default=32)
     ap.add_argument("--iters", type=int, default=5000)
@@ -81,7 +85,8 @@ def train(args) -> dict:
 
     tok, train_ids, val_ids, cpt = prepare_data(args.tokenizer, args.vocab)
     cfg = GPTConfig(vocab_size=tok.vocab_size, block_size=args.block, n_layer=args.n_layer,
-                    n_head=args.n_head, n_embd=args.n_embd, dropout=args.dropout)
+                    n_head=args.n_head, n_embd=args.n_embd, dropout=args.dropout, norm=args.norm,
+                    pos=args.pos, mlp=args.mlp, bias=not args.no_bias)
     model = GPT(cfg)
     n_params = model.num_parameters()
     say(f"tokenizer={args.tokenizer} vocab={tok.vocab_size} chars/token={cpt:.3f} "

@@ -3,7 +3,6 @@
   "use strict";
   const $ = (s) => document.querySelector(s);
   const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const pct = (v, d = 2) => (100 * v).toFixed(d) + "%";
   let demo, cnn, gptBundle, gpt;
 
@@ -15,6 +14,7 @@
   }
 
   async function main() {
+    setupChrome();
     try {
       const [d, cb, gb] = await Promise.all([
         fetch("assets/demo.json").then((r) => { if (!r.ok) throw new Error("demo.json " + r.status); return r.json(); }),
@@ -42,6 +42,7 @@
     if (r.gpt_log) { set("bpc", r.gpt_log.best_val_bpc.toFixed(2)); set("gpt_params", (r.gpt_log.params / 1e6).toFixed(1) + "M"); }
     if (demo.tests) set("tests", String(demo.tests));
     if (demo.engine_lines) set("engine_lines", String(demo.engine_lines));
+    if (r.quantization) set("q_ratio", (r.quantization.gpt.bytes_fp32 / r.quantization.gpt.bytes_int8).toFixed(1) + "×");
     set("gpt_arch", `${cfg.n_layer}-layer, ${cfg.n_head}-head, ${cfg.n_embd}-wide`);
   }
 
@@ -65,8 +66,9 @@
     const same = m.tok.decode(greedy) === demo.gpt.greedy;
     const ok = maxd < 1e-3 && same;
     $("#selftest").classList.toggle("fail", !ok);
-    $("#selftest b").textContent = (ok ? "✓ matches the Python reference" : "✗ mismatch with the Python reference") +
-      ` (max |Δ logit| ${maxd.toExponential(1)}, greedy text ${same ? "identical" : "differs"})`;
+    $("#selftest b").textContent = ok
+      ? `they match (the largest difference in any output is ${maxd.toExponential(1)}, and the greedy text is identical).`
+      : `they differ (largest difference ${maxd.toExponential(1)}, greedy text ${same ? "identical" : "different"}).`;
   }
 
   // ------------------------------------------------------------------ hero writer
@@ -96,7 +98,10 @@
   $("#hero-again").addEventListener("click", heroWrite);
 
   // ------------------------------------------------------------------ digits
-  let pixels = null;
+  // Drawings are ink on paper in either theme. The network only reads the alpha channel, so the colour is cosmetic.
+  const themeRgb = (name) => hexToRgb(getComputedStyle(document.documentElement).getPropertyValue(name).trim());
+  const inkHex = () => getComputedStyle(document.documentElement).getPropertyValue("--ink").trim();
+  let pixels = null, sampleCanvases = [];
   function setupDigits() {
     const pad = $("#pad"), ctx = pad.getContext("2d");
     let drawing = false, last = null, queued = false;
@@ -111,13 +116,13 @@
     };
     pad.addEventListener("pointerdown", (ev) => {
       drawing = true; last = pos(ev); pad.setPointerCapture(ev.pointerId);
-      ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(last[0], last[1], 10, 0, 2 * Math.PI); ctx.fill();
+      ctx.fillStyle = inkHex(); ctx.beginPath(); ctx.arc(last[0], last[1], 10, 0, 2 * Math.PI); ctx.fill();
       schedule();
     });
     pad.addEventListener("pointermove", (ev) => {
       if (!drawing) return;
       const p = pos(ev);
-      ctx.strokeStyle = "#fff"; ctx.lineWidth = 20; ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.strokeStyle = inkHex(); ctx.lineWidth = 20; ctx.lineCap = "round"; ctx.lineJoin = "round";
       ctx.beginPath(); ctx.moveTo(last[0], last[1]); ctx.lineTo(p[0], p[1]); ctx.stroke();
       last = p;
       schedule();
@@ -129,7 +134,7 @@
 
     const probs = $("#probs");
     for (let d = 0; d < 10; d++) {
-      probs.insertAdjacentHTML("beforeend", `<div class="prob" id="p${d}"><span>${d}</span><div class="track"><div class="fill" style="width:0"></div></div><span class="v">–</span></div>`);
+      probs.insertAdjacentHTML("beforeend", `<div class="prob" id="p${d}"><span>${d}</span><div class="track"><div class="fill"></div></div><span class="v">–</span></div>`);
     }
     const maps = $("#maps");
     for (let i = 0; i < 16; i++) {
@@ -146,16 +151,21 @@
       const c = document.createElement("canvas");
       c.width = 28; c.height = 28;
       c.getContext("2d").putImageData(toImage(c.getContext("2d"), s.pixels), 0, 0);
+      sampleCanvases.push([c, s.pixels]);
       b.appendChild(c);
       b.addEventListener("click", () => loadSample(s.pixels));
       samples.appendChild(b);
     });
     loadSample(demo.cnn.samples[0].pixels);
+    document.addEventListener("themechange", () => {
+      for (const [c, px] of sampleCanvases) c.getContext("2d").putImageData(toImage(c.getContext("2d"), px), 0, 0);
+      if (pixels) loadSample(pixels); else classify();
+    });
   }
 
   function toImage(ctx, px) {
-    const img = ctx.createImageData(28, 28);
-    for (let i = 0; i < 784; i++) { img.data[4 * i] = img.data[4 * i + 1] = img.data[4 * i + 2] = 255; img.data[4 * i + 3] = px[i]; }
+    const img = ctx.createImageData(28, 28), ink = themeRgb("--ink");
+    for (let i = 0; i < 784; i++) { img.data[4 * i] = ink[0]; img.data[4 * i + 1] = ink[1]; img.data[4 * i + 2] = ink[2]; img.data[4 * i + 3] = px[i]; }
     return img;
   }
 
@@ -200,6 +210,7 @@
     seen.clearRect(0, 0, 28, 28);
     if (!pixels) {
       $("#guess").firstChild.textContent = "–";
+      $("#guess small").textContent = "draw a digit";
       for (let d = 0; d < 10; d++) { const r = $("#p" + d); r.classList.remove("top"); r.querySelector(".fill").style.width = "0"; r.querySelector(".v").textContent = "–"; }
       document.querySelectorAll("#maps canvas").forEach((c) => c.getContext("2d").clearRect(0, 0, 28, 28));
       return;
@@ -209,13 +220,15 @@
     let top = 0;
     for (let d = 1; d < 10; d++) if (res.probs[d] > res.probs[top]) top = d;
     $("#guess").firstChild.textContent = String(top);
+    $("#guess small").textContent = pct(res.probs[top], 1) + " sure";
     for (let d = 0; d < 10; d++) {
-      const r = $("#p" + d);
+      const r = $("#p" + d), p = res.probs[d];
       r.classList.toggle("top", d === top);
-      r.querySelector(".fill").style.width = (100 * res.probs[d]).toFixed(1) + "%";
-      r.querySelector(".v").textContent = res.probs[d] >= 0.001 ? pct(res.probs[d], 1) : "<0.1%";
+      r.setAttribute("aria-label", `${d}: ${pct(p, 1)}`);
+      r.querySelector(".fill").style.width = (100 * p).toFixed(1) + "%";
+      r.querySelector(".v").textContent = p >= 0.001 ? pct(p, 1) : "<0.1%";
     }
-    const lo = hexToRgb(cssVar("--panel") || "#ffffff"), hi = hexToRgb(cssVar("--indigo") || "#3438a8");
+    const lo = themeRgb("--paper"), hi = themeRgb("--ink");
     document.querySelectorAll("#maps canvas").forEach((c, k) => {
       const g = c.getContext("2d"), img = g.createImageData(28, 28), off = k * 784;
       let mx = 1e-6;
@@ -230,7 +243,7 @@
   }
 
   // ------------------------------------------------------------------ GPT writer + attention inspector
-  let records = [], running = false;
+  let records = [], running = false, genToken = 0;
   function setupGPT() {
     const cfg = gptBundle.manifest.config;
     const layer = $("#attn-layer"), head = $("#attn-head");
@@ -239,15 +252,29 @@
     head.insertAdjacentHTML("beforeend", `<option value="-1">mean</option>`);
     for (let h = 0; h < cfg.n_head; h++) head.insertAdjacentHTML("beforeend", `<option value="${h}">${h + 1}</option>`);
     for (const [id, out] of [["temp", "temp-out"], ["topk", "topk-out"], ["len", "len-out"]]) {
-      $("#" + id).addEventListener("input", (e) => { $("#" + out).textContent = e.target.value; });
+      const el = $("#" + id);
+      el.addEventListener("input", () => { $("#" + out).textContent = el.value; });
     }
     $("#gen-form").addEventListener("submit", (e) => { e.preventDefault(); running ? (running = false) : generate(); });
+    const chips = $("#prompt-chips");
+    for (const p of ["ROMEO:\n", "JULIET:\n", "KING RICHARD III:\n", "First Citizen:\n", "To be, or not to be"]) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "linkish"; b.textContent = p.replace(/:?\n$/, "");
+      b.addEventListener("click", () => { $("#prompt").value = p; generate(); });
+      chips.appendChild(b);
+    }
     const outEl = $("#gen-out");
     outEl.addEventListener("pointerover", (e) => { const i = e.target.dataset && e.target.dataset.i; if (i !== undefined) inspect(+i); });
     outEl.addEventListener("focusin", (e) => { const i = e.target.dataset && e.target.dataset.i; if (i !== undefined) inspect(+i); });
     layer.addEventListener("change", () => lastInspected >= 0 && inspect(lastInspected));
     head.addEventListener("change", () => lastInspected >= 0 && inspect(lastInspected));
-    generate(true);
+    // the opening sample waits until the section is close, so it doesn't slow down the writer at the top of the page
+    if ("IntersectionObserver" in window) {
+      const io = new IntersectionObserver((es) => {
+        if (es.some((e) => e.isIntersecting)) { io.disconnect(); if (!records.length && !running) generate(true); }
+      }, { rootMargin: "300px 0px" });
+      io.observe($("#shakespeare"));
+    } else generate(true);
   }
 
   function addChar(ch, rec, isPrompt) {
@@ -272,9 +299,11 @@
     if (!out) { out = gpt.step(gpt.tok.encode("\n")[0]); addChar("\n", out, true); }
     const n = initial ? 400 : +$("#len").value, T = +$("#temp").value, K = +$("#topk").value;
     let made = 0, spent = 0;
+    const token = ++genToken;
     running = true;
     btn.textContent = "Stop";
     const chunk = () => {
+      if (token !== genToken) return;
       if (!running) return finish();
       const t0 = performance.now();
       while (made < n && performance.now() - t0 < 14) {
@@ -312,7 +341,7 @@
       const r = records[start + t];
       if (!r) continue;
       const a = Math.round((w[t] / mx) * 60);
-      if (a > 2) { r.el.style.backgroundColor = `color-mix(in srgb, var(--indigo) ${a}%, transparent)`; lit.push(r.el); }
+      if (a > 2) { r.el.style.backgroundColor = `color-mix(in srgb, var(--attn) ${a}%, transparent)`; lit.push(r.el); }
       top.push([w[t], r.ch]);
     }
     rec.el.classList.add("focus");
@@ -323,29 +352,47 @@
   }
 
   // ------------------------------------------------------------------ experiments
+  /** opts: { eyebrow, title, finding, short?, wide?, target? } — target is a selector for the grid to add to (default "#figs"). */
+  let figNo = 2;
   function fig(opts) {
     const f = document.createElement("figure");
     f.className = "fig" + (opts.wide ? " wide" : "");
-    f.style.margin = "0";
-    f.innerHTML = `<div class="eyebrow">${opts.eyebrow}</div><h3>${opts.title}</h3><p class="finding">${opts.finding}</p>`;
-    $("#figs").appendChild(f);
+    f.id = "fig-" + opts.title.toLowerCase().replace(/<[^>]+>/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    f.dataset.short = opts.short || opts.title;
+    f.innerHTML = `<span class="tag">Figure ${++figNo} · ${opts.eyebrow}</span><h3>${opts.title}</h3><p class="finding">${opts.finding}</p>`;
+    $(opts.target || "#figs").appendChild(f);
     return f;
   }
   function chartIn(f) { const c = document.createElement("div"); c.className = "chart"; f.appendChild(c); return c; }
   function note(f, html) { const p = document.createElement("p"); p.className = "method"; p.innerHTML = html; f.appendChild(p); }
-  function table(f, head, rows) {
+  /** Tables fold into a "show the numbers" disclosure unless visible is set, so each figure leads with its chart. */
+  function table(f, head, rows, visible) {
     const d = document.createElement("div");
     d.className = "table-scroll";
     d.innerHTML = `<table><thead><tr>${head.map((h) => `<th class="${h.num ? "num" : ""}">${h.t}</th>`).join("")}</tr></thead><tbody>` +
       rows.map((r) => `<tr>${r.map((c, j) => `<td class="${head[j].num ? "num" : ""}">${c}</td>`).join("")}</tr>`).join("") + "</tbody></table>";
-    f.appendChild(d);
+    if (visible) return f.appendChild(d);
+    let more = f.querySelector(":scope > details.more");
+    if (!more) { more = document.createElement("details"); more.className = "more"; more.innerHTML = "<summary>show the numbers</summary>"; f.appendChild(more); }
+    more.appendChild(d);
+  }
+
+  function figIndex() {
+    const nav = $("#fig-index");
+    nav.textContent = "Jump to: ";
+    document.querySelectorAll("#figs > .fig").forEach((f, i) => {
+      if (i) nav.insertAdjacentHTML("beforeend", '<span class="sep">·</span>');
+      const a = document.createElement("a");
+      a.href = "#" + f.id; a.textContent = f.dataset.short;
+      nav.appendChild(a);
+    });
   }
 
   function renderExperiments() {
     const R = demo.results;
     const g = R.gpt_log;
     if (g) {
-      const f = fig({ wide: true, eyebrow: "Flagship model", title: "GPT training on Tiny Shakespeare",
+      const f = fig({ wide: true, eyebrow: "Flagship model", title: "GPT training on Tiny Shakespeare", short: "GPT training",
         finding: `Validation loss reached <b>${g.best_val.toFixed(3)}</b> nats per character (<b>${g.best_val_bpc.toFixed(2)}</b> bits per character) after ${g.best_step.toLocaleString()} steps. Training took ${(g.train_time_s / 60).toFixed(0)} minutes on a laptop CPU, about ${Math.round(g.steps[g.steps.length - 1].tok_per_s).toLocaleString()} tokens per second.` });
       Charts.lineChart(chartIn(f), { series: [
         { name: "train", color: "--s1", points: g.evals.map((e) => [e.step, e.train]) },
@@ -357,7 +404,7 @@
 
     const m = R.mnist_log;
     if (m) {
-      const f = fig({ eyebrow: "Demo 1 model", title: "CNN training on MNIST",
+      const f = fig({ eyebrow: "Demo 1 model", title: "CNN training on MNIST", short: "CNN training",
         finding: `<b>${pct(m.test_acc)}</b> test accuracy (${Math.round((1 - m.test_acc) * 10000)} errors in 10,000) after ${m.config.epochs} epochs and ${(m.train_time_s / 60).toFixed(1)} minutes of training.` });
       Charts.lineChart(chartIn(f), { series: [{ name: "training loss", color: "--s1", points: m.steps.map((s) => [s.step, s.loss]) }],
         xLabel: "training step", yLabel: "cross-entropy", yLog: true, height: 230 });
@@ -365,7 +412,7 @@
       const cm = m.confusion, off = [];
       cm.forEach((row, i) => row.forEach((v, j) => { if (i !== j && v) off.push([v, i, j]); }));
       off.sort((a, b) => b[0] - a[0]);
-      const f2 = fig({ eyebrow: "Error analysis", title: "Where the errors went",
+      const f2 = fig({ eyebrow: "Error analysis", title: "Where the errors went", short: "Errors",
         finding: `The misclassifications only, by true and predicted digit. The most common confusion is a <b>${off[0][1]}</b> read as a <b>${off[0][2]}</b> (${off[0][0]} images), then ${off[1][1]} as ${off[1][2]} (${off[1][0]}).` });
       Charts.heatmap(chartIn(f2), { matrix: cm, labels: [..."0123456789"], skipDiagonal: true, rowLabel: "true", colLabel: "predicted", aria: "confusion matrix" });
       note(f2, "Rows are the true digit and columns the prediction. Correct predictions on the diagonal are left blank.");
@@ -381,7 +428,7 @@
       const finding = sig.length
         ? `After tuning each optimizer's learning rate, <b>${best.k}</b> reached the best validation accuracy (${pct(best.val_acc.mean)}) and beat ${sig.join(", ")} significantly (Welch's t-test, p < 0.05).`
         : `Once each learning rate is tuned, all five optimizers finish within <b>${(100 * spread).toFixed(2)} points</b> of each other, and none differs significantly from the best (Welch's t-test, every p > 0.05). On this problem the learning rate matters more than the choice of optimizer.`;
-      const f = fig({ eyebrow: "Ablation A", title: "Which optimizer, once each is tuned?", finding });
+      const f = fig({ eyebrow: "Ablation A", title: "Which optimizer, once each is tuned?", short: "Optimizers", finding });
       Charts.barChart(chartIn(f), { dots: true, labelWidth: 118, valueName: "val accuracy", fmt: (v) => pct(v, 2),
         domain: [lo - (hi - lo) * 0.15, hi + (hi - lo) * 0.1], xLabel: "validation accuracy (mean, 95% CI)",
         bars: rows.map((r) => ({ label: r.k, value: r.val_acc.mean, lo: r.val_acc.mean - r.val_acc.ci95, hi: r.val_acc.mean + r.val_acc.ci95,
@@ -406,7 +453,7 @@
             : act === "tanh" ? `${n} saturates every unit at ±1`
             : last >= 1e30 ? `${n} overflows to infinity` : `${n} explodes (std ${last.toExponential(0)})`;
         };
-        const f = fig({ eyebrow: "Ablation B · " + act, title: `Signal through ${B.depth} ${act === "relu" ? "ReLU" : "tanh"} layers`,
+        const f = fig({ eyebrow: "Ablation B · " + act, title: `Signal through ${B.depth} ${act === "relu" ? "ReLU" : "tanh"} layers`, short: `Init (${act === "relu" ? "ReLU" : "tanh"})`,
           finding: `Activation spread at initialisation, layer by layer. ${failed.map(([n]) => why(n)).join("; ")}${failed.length ? ", and neither learns anything." : ""} ` +
             `Only the fan-in-scaled inits train: ${trained.map(([n, a]) => `<b>${n}</b> ${pct(a, 1)}`).join(", ")} after ${B.epochs} epochs.` +
             (act === "relu" ? ` Xavier's signal still shrinks ${Math.round(B.results["relu / Kaiming"].act_std.at(-1) / B.results["relu / Xavier"].act_std.at(-1))}× more than Kaiming's, because it ignores that ReLU zeroes half its inputs. Kaiming's √2 gain corrects for that.` : "") });
@@ -425,7 +472,7 @@
       const bestNb = nb.reduce((a, b) => (b.val_acc.mean > a.val_acc.mean ? b : a));
       const worstWb = wb.reduce((a, b) => (b.val_acc.mean < a.val_acc.mean ? b : a));
       const lrs = wb.map((r) => r.lr), range = Math.round(Math.max(...lrs) / Math.min(...lrs));
-      const f = fig({ eyebrow: "Ablation C", title: "BatchNorm makes the learning rate forgiving",
+      const f = fig({ eyebrow: "Ablation C", title: "BatchNorm makes the learning rate forgiving", short: "BatchNorm",
         finding: `The same ${C.depth}-layer ReLU MLP with PyTorch's default initialisation. Without BatchNorm, the best of ${nb.length} learning rates reaches only <b>${pct(bestNb.val_acc.mean, 1)}</b>: small rates barely move a signal that shrinks at every layer, and large ones diverge. With BatchNorm, every rate from ${Math.min(...lrs)} to ${Math.max(...lrs)}, a ${range}× range, reaches at least <b>${pct(worstWb.val_acc.mean, 1)}</b>.` });
       Charts.lineChart(chartIn(f), { series, xLog: true, xLabel: "learning rate (log)", yLabel: "val accuracy", yFmt: (v) => pct(v, 0), height: 240, endLabels: true, xFmt: (v) => String(v) });
       note(f, `${C.seeds} seeds per point, ${C.epochs} epochs each. A diverged run counts as chance accuracy (10%).`);
@@ -436,7 +483,7 @@
       const pts = S.rows.map((r) => [r.non_embedding_params, r.val_loss]);
       const xs = pts.map((p) => p[0]), fitPts = [];
       for (let k = 0; k <= 40; k++) { const n = Math.min(...xs) * Math.pow(Math.max(...xs) / Math.min(...xs), k / 40); fitPts.push([n, S.fit.E + S.fit.A * Math.pow(n, -S.fit.alpha)]); }
-      const f = fig({ eyebrow: "Scaling study", title: "A small scaling law",
+      const f = fig({ eyebrow: "Scaling study", title: "A small scaling law", short: "Scaling law",
         finding: `Six GPTs trained on identical data and steps. Validation loss follows L(N) ≈ ${S.fit.E >= 0.01 ? S.fit.E.toFixed(2) + " + " : ""}${S.fit.A.toFixed(2)}·N<sup>−${S.fit.alpha.toFixed(3)}</sup> in non-embedding parameters N (R² = ${S.fit.r2.toFixed(3)}). ` +
           `The curve bends at the largest sizes: with a fixed budget of ${(S.tokens / 1e6).toFixed(1)}M tokens, bigger models are increasingly under-trained.` });
       Charts.lineChart(chartIn(f), { series: [{ name: "trained model", color: "--s1", points: pts, markers: true, noLine: true }],
@@ -447,7 +494,7 @@
     const T = R.tokenizers;
     if (T) {
       const rows = T.rows.slice().sort((a, b) => a.val_bpc - b.val_bpc);
-      const f = fig({ eyebrow: "Tokenizer study", title: "Characters or BPE, at equal compute",
+      const f = fig({ eyebrow: "Tokenizer study", title: "Characters or BPE, at equal compute", short: "Tokenizers",
         finding: `The same architecture and budget with four tokenizers, compared in bits per character. <b>${rows[0].tokenizer}</b> does best: each token spans ${rows[0].chars_per_token.toFixed(2)} characters, so the model sees more text per step and more context per window.` });
       Charts.barChart(chartIn(f), { labelWidth: 118, valueName: "bits/char", fmt: (v) => v.toFixed(2), xLabel: "validation bits per character (lower is better)",
         bars: rows.map((r, i) => ({ label: r.tokenizer, value: r.val_bpc, emphasis: i === 0 ? undefined : false, note: `vocab ${r.vocab_size} · ${r.chars_per_token.toFixed(2)} chars/token` })) });
@@ -457,18 +504,30 @@
 
     const Q = R.quantization, Bm = R.benchmark;
     if (Q || Bm) {
-      const f = fig({ eyebrow: "Engineering", title: "Speed and size",
+      const f = fig({ eyebrow: "Engineering", title: "Speed and size", short: "Speed and size",
         finding: (Q ? `int8 weights make the models ${(Q.gpt.bytes_fp32 / Q.gpt.bytes_int8).toFixed(1)}× smaller. The CNN's test accuracy moves by ${((Q.cnn.int8 - Q.cnn.fp32) * 100).toFixed(2)} points and the GPT's validation loss by ${(Q.gpt.int8 - Q.gpt.fp32 >= 0 ? "+" : "") + (Q.gpt.int8 - Q.gpt.fp32).toExponential(1)} nats. ` : "") +
           (Bm ? `A training step in Sutra takes ${Math.min(...Bm.rows.map((r) => r.slowdown)).toFixed(1)}–${Math.max(...Bm.rows.map((r) => r.slowdown)).toFixed(1)}× as long as in PyTorch on the same CPU.` : "") });
       if (Q) table(f, [{ t: "model" }, { t: "metric" }, { t: "float32", num: true }, { t: "int8", num: true }, { t: "size", num: true }],
         [["CNN", "test accuracy", pct(Q.cnn.fp32), pct(Q.cnn.int8), `${(Q.cnn.bytes_fp32 / 1e6).toFixed(2)} → ${(Q.cnn.bytes_int8 / 1e6).toFixed(2)} MB`],
-         ["GPT", "val loss (nats)", Q.gpt.fp32.toFixed(5), Q.gpt.int8.toFixed(5), `${(Q.gpt.bytes_fp32 / 1e6).toFixed(1)} → ${(Q.gpt.bytes_int8 / 1e6).toFixed(1)} MB`]]);
+         ["GPT", "val loss (nats)", Q.gpt.fp32.toFixed(5), Q.gpt.int8.toFixed(5), `${(Q.gpt.bytes_fp32 / 1e6).toFixed(1)} → ${(Q.gpt.bytes_int8 / 1e6).toFixed(1)} MB`]], true);
       if (Bm) {
         table(f, [{ t: "training step" }, { t: "Sutra", num: true }, { t: "PyTorch", num: true }, { t: "ratio", num: true }],
-          Bm.rows.map((r) => [r.model, r.sutra_ms.toFixed(1) + " ms", r.torch_ms.toFixed(1) + " ms", r.slowdown.toFixed(1) + "×"]));
+          Bm.rows.map((r) => [r.model, r.sutra_ms.toFixed(1) + " ms", r.torch_ms.toFixed(1) + " ms", r.slowdown.toFixed(1) + "×"]), true);
         note(f, `Median of 20 steps (forward, backward, AdamW) in float32 on ${Bm.machine}, NumPy ${Bm.numpy}, PyTorch ${Bm.torch}.`);
       }
     }
+    figIndex();
+  }
+
+  // ------------------------------------------------------------------ theme switch
+  function setupChrome() {
+    const root = document.documentElement;
+    $("#theme-toggle").addEventListener("click", () => {
+      const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+      root.dataset.theme = dark ? "light" : "dark";
+      try { localStorage.setItem("sutra-theme", root.dataset.theme); } catch (e) { /* storage blocked: the choice lasts this visit */ }
+      document.dispatchEvent(new Event("themechange"));
+    });
   }
 
   main();
